@@ -59,7 +59,7 @@ public class Server {
             null, "Easy", null, "Normal", null, "Hard", null, "Expert", null, "Expert+"
     };
     private static String getDifficultyName(int diffRank) {
-        if (diffRank < 0 || diffRank > colors.length) {
+        if (diffRank < 0 || diffRank > DIFFICULTIES.length) {
             return null;
         }
         return DIFFICULTIES[diffRank];
@@ -224,7 +224,7 @@ public class Server {
 
         discordClient.getChannelById(Snowflake.of(channelId)).ofType(MessageChannel.class)
                 .flatMap(channel -> channel.createMessage(EmbedCreateSpec.builder()
-                                .title(level.getSongName() + " [" + score.difficulty.trim() + "]")
+                                .title(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]")
                                 .url("https://bsaber.com/songs/" + level.getId() + "/")
                                 .description("<@"+ user.discordId + "> set a new high score of " + score.score)
                                 .color(getColor(score.difficultyRank))
