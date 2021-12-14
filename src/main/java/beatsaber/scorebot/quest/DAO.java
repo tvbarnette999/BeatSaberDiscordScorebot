@@ -163,8 +163,11 @@ public class DAO {
     }
 
     public List<Level> getLevelsByName(String name) {
+        if (name.length() < 3) {
+            return new ArrayList<>();
+        }
         // Text query/index?
-        return levelCollection.find(Filters.regex("songName", ".*" + name + ".*", "i")).into(new ArrayList<>());
+        return levelCollection.find(Filters.regex("songName", ".*" + name + ".*", "i")).limit(25).into(new ArrayList<>());
     }
 
     public Level getLevelByNameExact(String name) {
