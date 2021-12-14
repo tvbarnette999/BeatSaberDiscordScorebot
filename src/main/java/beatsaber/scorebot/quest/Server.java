@@ -1,8 +1,7 @@
 package beatsaber.scorebot.quest;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
+import com.mongodb.client.model.Filters;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
 import discord4j.core.GatewayDiscordClient;
@@ -34,6 +33,8 @@ import java.net.URLDecoder;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static spark.Spark.after;
 
 public class Server {
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
@@ -89,6 +90,7 @@ public class Server {
             level.setSongSubName(meta.getString("songSubName"));
             level.setSongAuthorName(meta.getString("songAuthorName"));
             level.setLevelAuthorName(meta.getString("levelAuthorName"));
+            level.setTimestamp(System.currentTimeMillis());
             dao.saveLevel(level);
             return level;
         }
@@ -249,6 +251,47 @@ public class Server {
             ScoreSubmission score = new Gson().fromJson(request.queryParams("data"), ScoreSubmission.class);
             scoreSubmission(score);
             return "OK";
+        });
+        Spark.get("/scores", (request, response) -> {
+           response.header("Content-Type", "application/json");
+           long since = 0;
+           try {
+               since = Long.parseLong(request.headers("X-Modified-Since"));
+           } catch(Exception e) {
+               // 0
+           }
+           GsonBuilder builder = new GsonBuilder();
+           builder.addSerializationExclusionStrategy(new ExclusionStrategy() {
+
+               @Override
+               public boolean shouldSkipField(FieldAttributes f) {
+                   for (String s : new String[]{"songHash", "difficulty", "userDiscordId", "score", "fullCombo"}) {
+                       if (s.equals(f.getName())) {
+                           return false;
+                       }
+                   }
+                   return true;
+               }
+
+               @Override
+               public boolean shouldSkipClass(Class<?> clazz) {
+                   return false;
+               }
+           });
+           return builder.create().toJson(dao.getAllScores(since));
+        });
+        Spark.get("/levels", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            long since = 0;
+            try {
+                since = Long.parseLong(request.headers("X-Modified-Since"));
+            } catch (Exception e) {
+                // 0
+            }
+            return new Gson().toJson(dao.getAllLevels(since));
+        });
+        after((request, response) -> {
+            response.header("Content-Encoding", "gzip");
         });
 
         discordClient = DiscordClient.create(DiscordBotToken).gateway().login().block();

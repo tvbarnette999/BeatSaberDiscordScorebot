@@ -1,10 +1,8 @@
 package beatsaber.scorebot.quest;
 
-import com.mongodb.AggregationOptions;
-import com.mongodb.Block;
-import com.mongodb.DuplicateKeyException;
-import com.mongodb.MongoClientSettings;
+import com.mongodb.*;
 import com.mongodb.client.*;
+import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.*;
 import com.mongodb.operation.AggregateOperation;
 import org.bson.Document;
@@ -179,5 +177,11 @@ public class DAO {
     public int getHighestDifficulty(String hash) {
         Score s = scoreCollection.find(eq("songHash", hash)).sort(Sorts.descending("difficulty")).projection(Projections.include("difficulty")).limit(1).first();
         return s == null ? -1 : s.difficulty;
+    }
+    public List<Score> getAllScores(long postedSince) {
+        return scoreCollection.find(Filters.gte("timestamp", postedSince)).projection(Projections.include("songHash", "difficulty", "userDiscordId", "score", "fullCombo")).into(new ArrayList<>());
+    }
+    public List<Level> getAllLevels(long since) {
+        return levelCollection.find(Filters.gte("timestamp", since)).into(new ArrayList<>());
     }
 }

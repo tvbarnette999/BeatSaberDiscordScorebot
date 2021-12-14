@@ -14,4 +14,5 @@ public class Level {
     String songAuthorName;
     String levelAuthorName;
     boolean ranked;
+    long timestamp;
 }
