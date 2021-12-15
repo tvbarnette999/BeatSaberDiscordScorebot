@@ -164,7 +164,11 @@ public class Server {
             return;
         }
         final String PREFIX = "custom_level_";
-        String hash = score.levelId.startsWith(PREFIX) ? score.levelId.substring(PREFIX.length()) : null;
+        String hash1 = score.levelId.startsWith(PREFIX) ? score.levelId.substring(PREFIX.length()) : null;
+        if (hash1 != null && hash1.contains("_")) {
+            hash1 = hash1.substring(0, hash1.indexOf("_"));
+        }
+        String hash = hash1;
         if (hash == null) {
             LOG.warn("Unhashed song! {}", score.levelId);
             return;
@@ -360,6 +364,25 @@ public class Server {
                     } else {
                         return Flux.error(new IllegalArgumentException("Must pass a scoresaber id"));
                     }
+                case "bsaber":
+                    opt = event.getOption("id");
+                    if (opt.isPresent()) {
+                        if (opt.get().getType() == ApplicationCommandOption.Type.STRING && opt.get().getValue().isPresent()) {
+                            String bsaberId = opt.get().getValue().get().asString();
+                            discordUser = event.getInteraction().getUser();
+                            user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                            if (user == null) {
+                                return Flux.error(new IllegalArgumentException("No connected user! Use `/signup` first."));
+                            }
+                            user.setBsaber(bsaberId);
+                            dao.saveUser(user);
+                            return event.reply("<@" + discordUser.getId().asLong() + "> mapped to bsaber user https://bsaber.com/members/" + user.bsaber + "/");
+                        }  else {
+                            return Flux.error(new IllegalArgumentException("bsaber id must be a valid string"));
+                        }
+                    } else {
+                        return Flux.error(new IllegalArgumentException("Must pass a bsaber id"));
+                    }
                 case "common":
                     // return a randomized of songs for which all passed users have posted scores. param: n the number
                     opt = event.getOption("count");
@@ -472,6 +495,16 @@ public class Server {
                         .name("id")
                         .description("Scoresaber user ID")
                         .type(ApplicationCommandOption.Type.INTEGER.getValue())
+                        .required(true)
+                        .build())
+                .build());
+        list.add(ApplicationCommandRequest.builder()
+                .name("bsaber")
+                .description("Associate your account with a baaber account")
+                .addOption(ApplicationCommandOptionData.builder()
+                        .name("id")
+                        .description("bsaber user ID")
+                        .type(ApplicationCommandOption.Type.STRING.getValue())
                         .required(true)
                         .build())
                 .build());

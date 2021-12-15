@@ -11,4 +11,5 @@ public class User {
     long discordId;
     String displayName;
     long scoresaberId;
+    String bsaber;
 }
