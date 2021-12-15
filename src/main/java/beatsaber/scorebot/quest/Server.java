@@ -2,8 +2,10 @@ package beatsaber.scorebot.quest;
 
 import com.google.gson.*;
 import com.mongodb.client.model.Filters;
+import discord4j.common.ReactorResources;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
+import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
@@ -23,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.resources.ConnectionProvider;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import spark.Spark;
@@ -31,6 +34,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.text.DecimalFormat;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -241,6 +245,7 @@ public class Server {
                                 .addField("Leaderboard:", getSongLeaderboardEmbedField(leaderboard), false)
                                 .build()))//.withContent("<@"+ user.discordId + ">"))
                 .retry(5).block();
+
     }
 
     public static void main(String[] args) {
@@ -298,7 +303,12 @@ public class Server {
             response.header("Content-Encoding", "gzip");
         });
 
-        discordClient = DiscordClient.create(DiscordBotToken).gateway().login().block();
+
+        discordClient = DiscordClient.builder(DiscordBotToken).setReactorResources(
+                ReactorResources.builder().httpClient(
+                        ReactorResources.newHttpClient(ConnectionProvider.builder("custom").maxIdleTime(Duration.ofMinutes(4)).build())
+                ).build()
+        ).build().gateway().login().block();
         discordClient.on(ChatInputInteractionEvent.class, event -> {
             Optional<ApplicationCommandInteractionOption> opt;
             discord4j.core.object.entity.User discordUser;
