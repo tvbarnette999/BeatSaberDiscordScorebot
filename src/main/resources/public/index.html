@@ -38,6 +38,9 @@
         }
         return s;
     }
+    const DIFF = [
+        "", "E", "", "N", "", "H", "", "Ex", "", "Ex+"
+    ]
     function render() {
         if ($.fn.dataTable.isDataTable("#scoresTable")) {
             let dt = $("#scoresTable").DataTable();
@@ -46,7 +49,12 @@
             return;
         }
         let cols = [
-            {title: "Diff", data: "difficulty", width: "30px", render: (d) => d},
+            {title: "Diff", data: "difficulty", width: "30px", render: (d,t,r) => {
+                if (t === 'display') {
+                    return `<div class="diff d${d}">${DIFF[d]}</div>`;
+                }
+                return d;
+            }},
             {title: "Song", data: "level.songName", render: (d,t,r) => {
                     return `<div style="float:left;">
                             <img width="35" style="border-radius:15%" src="https://scoresaber.com/imports/images/songs/${r.hash}.png"/>
@@ -110,7 +118,6 @@
                         ourScore.rank = ssRow.scores[i].rank;
                         ourScore.ssScore = ssRow.scores[i].score;
                         ourScore.ssMatch = ssRow.scores[i].score === ourScore.score;
-                        console.log("SS RANK!:", ourScore.rank);
                     }
                 }
             }
@@ -125,6 +132,14 @@
         color: white;
     }
      */
+    :root {
+        /* Copied from scoresaber*/
+        --expert-plus: #8f48db;
+        --expert: #bf2a42;
+        --hard: tomato;
+        --normal: #59b0f4;
+        --easy: MediumSeaGreen;
+    }
     .table td {
         padding-top: 4px;
         padding-bottom: 1px;
@@ -177,6 +192,27 @@
         height: 1em;
         position: relative;
         top: -2px;
+    }
+    .diff {
+        color: white;
+        padding: 4px 4px 3px;
+        border-radius: 4px;
+        text-align: center;
+    }
+    .diff.d9 {
+        background-color: var(--expert-plus);
+    }
+    .diff.d7 {
+        background-color: var(--expert);
+    }
+    .diff.d5 {
+        background-color: var(--hard);
+    }
+    .diff.d3 {
+        background-color: var(--normal);
+    }
+    .diff.d1 {
+        background-color: var(--easy);
     }
 </style>
 </html>
