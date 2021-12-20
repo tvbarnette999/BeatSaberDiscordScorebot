@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Beat Saber Scores</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"/>
+    <!-- <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css"/> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap4.min.css"/>
+</head>
+<body>
+<div id="event"></div>
+<table id="scoresTable" class="table table-striped table-hover" style="word-break:break-word; width: 100%;"></table>
+
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+        crossorigin="anonymous"></script>
+<style src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"></style>
+<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap4.min.js"></script>
+<script src="https://use.fontawesome.com/56bce617c5.js"></script>
+
+<script src="/scoresaber.js"></script>
+<script src="/index.js"></script>
+<script>
+    let data = [];
+    $(document).ready(() => {
+        initLeaderboard();
+    });
+    function renderNumber(n) {
+        let s = "" + n;
+        if (n > 999999) {
+            s = s.substring(0, s.length - 6) + "," + s.substring(s.length - 6);
+        }
+        if (n > 999) {
+            s = s.substring(0, s.length - 3) + "," + s.substring(s.length - 3);
+        }
+        return s;
+    }
+    function render() {
+        if ($.fn.dataTable.isDataTable("#scoresTable")) {
+            let dt = $("#scoresTable").DataTable();
+            dt.clear()
+            dt.rows.add(data).draw();
+            return;
+        }
+        let cols = [
+            {title: "Diff", data: "difficulty", width: "30px", render: (d) => d},
+            {title: "Song", data: "level.songName", render: (d,t,r) => {
+                    return `<div style="float:left;">
+                            <img width="35" style="border-radius:15%" src="https://scoresaber.com/imports/images/songs/${r.hash}.png"/>
+                        </div><div style="float: left;" class="songTitle">
+                            ${d}
+                            <span class="songBtnWrapper">
+                                <a title="Open in BeatSaver" class="songBtn" href="https://beatsaver.com/beatmap/${r.level.id}" target="_blank"><svg  class="songBtn"  xmlns='http://www.w3.org/2000/svg'   width='200' height='200' viewBox='0 0 200 200' version='1.1'><g fill='none' stroke='#000000' stroke-width='10'> <path d='M 100,7 189,47 100,87 12,47 Z' stroke-linejoin='round'/> <path d='M 189,47 189,155 100,196 12,155 12,47' stroke-linejoin='round'/> <path d='M 100,87 100,196' stroke-linejoin='round'/> <path d='M 26,77 85,106 53,130 Z' stroke-linejoin='round'/> </g> </svg></a>
+                                <a href="beatsaver://${r.level.id}" class="fa fa-hand-pointer-o songBtn" title="One-Click Install" target="_blank"></a>
+                                <a href="https://bsaber.com/songs/${r.level.id}" class="fa fa-external-link songBtn" title="Open in BeastSaber" target="_blank"></a>
+                                <a href="https://api.beatsaver.com/download/key/${r.level.id}" class="fa fa-download songBtn" title="Download Zip"></a>
+                                <a href="https://skystudioapps.com/bs-viewer/?id=${r.level.id}" class="fa fa-play-circle songBtn" title="Preview" target="_blank"></a>
+                                ${r.scoresaberId ? `<a href='https://scoresaber.com/leaderboard/${r.scoresaberId}' target="_blank" title="Global Leaderboard"><image class='ssLink' src='https://new.scoresaber.com/favicon.ico'/></a>` : ""}
+                            </span>
+                            <br>${r.level.songAuthorName}
+                        </div>`;
+                }},
+            {title: "Scores", data: "scoreCount", width: "60px"}
+        ];
+        for (let u of users) {
+            cols.push({title: u.displayName, data: "scores." + u.discordId + ".score", defaultContent: "", render: (d,t,r) => {
+                    if (t === 'display') {
+                        if(!r.scores[u.discordId]) {
+                            return "";
+                        }
+                        let clazz = ""
+
+                        switch (r.scores[u.discordId].localRank) {
+                            case 1: clazz = "gold"; break;
+                            case 2: clazz = "silver"; break;
+                            case 3: clazz = "bronze"; break;
+                        }
+                        return `<div class="score">
+                                    ${renderNumber(d)}<div class="medal ${clazz}">${r.scores[u.discordId].localRank}</div><br>
+                                    <span ${r.scores[u.discordId].rank && !r.scores[u.discordId].ssMatch ? `class="ssMismatch" title="Scoresaber score: ${renderNumber(r.scores[u.discordId].ssScore)}"` : ""}>${r.scores[u.discordId].rank ? `(<a href="https://scoresaber.com/leaderboard/${r.scoresaberId}?page=${Math.floor((r.scores[u.discordId].rank -1) / 12) + 1}" target="_blank">#${renderNumber(r.scores[u.discordId].rank)}</a>)` : '(--)'}</span>
+                                </div> `
+                    }
+                    return d;
+                }
+            });
+        }
+        $("#scoresTable").DataTable({
+            data: data,
+            columns: cols,
+            order: [[2, "desc"], [1, "asc"], [0, "desc"]],
+            paging: false
+        });
+    }
+    function mergeScoresaberData(scoresaberData) {
+        const map = new Map();
+        for (let ss of scoresaberData) {
+            map.set(ss.songHash + "#" + ss.difficulty, ss);
+        }
+        for (let level of data) {
+            let k = level.hash + "#" + level.difficulty
+            if (map.has(k)) {
+                let ssRow = map.get(k);
+                level.scoresaberId = ssRow.leaderboardId;
+                for (let i in ssRow.scores) {
+                    let ourScore = level.scores[users.find(x => x.scoresaberIdString === i).discordId];
+                    if (ourScore && ssRow.scores[i]) {
+                        ourScore.rank = ssRow.scores[i].rank;
+                        ourScore.ssScore = ssRow.scores[i].score;
+                        ourScore.ssMatch = ssRow.scores[i].score === ourScore.score;
+                        console.log("SS RANK!:", ourScore.rank);
+                    }
+                }
+            }
+        }
+        render();
+    }
+</script>
+<style>
+    /*
+    html, body {
+        background-color: black;
+        color: white;
+    }
+     */
+    .table td {
+        padding-top: 4px;
+        padding-bottom: 1px;
+    }
+    .songTitle {
+        line-height: 1.1;
+        padding-left: 5px;
+    }
+    .score {
+        line-height: 1.3;
+    }
+    .score span {
+        font-size: small;
+    }
+    .songBtnWrapper {
+        padding-left: 10px;
+    }
+
+    .songBtn {
+        width: 1em;
+        height: 1em;
+        cursor: pointer;
+        color: black;
+    }
+
+    .medal {
+        border-radius: 10px;
+        color:black;
+        margin: 5px;
+        border: 1px solid black;
+        width: 25px;
+        float: left;
+        text-align: center;
+        font-size: small;
+    }
+    .medal.gold {
+        background-color: gold;
+    }
+    .medal.silver {
+        background-color: silver;
+    }
+    .medal.bronze {
+        background-color: #cd7f32;
+    }
+    .ssMismatch {
+        text-decoration: line-through;
+    }
+    .ssLink {
+        width: 1em;
+        height: 1em;
+        position: relative;
+        top: -2px;
+    }
+</style>
+</html>

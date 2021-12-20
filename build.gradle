@@ -35,3 +35,6 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+sourceSets.main.compileClasspath = files('src/main/resources/') + sourceSets.main.compileClasspath
+sourceSets.main.runtimeClasspath = files('src/main/resources/') + sourceSets.main.runtimeClasspath

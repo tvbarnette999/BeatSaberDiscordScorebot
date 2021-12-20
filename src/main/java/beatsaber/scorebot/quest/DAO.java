@@ -187,4 +187,7 @@ public class DAO {
     public List<Level> getAllLevels(long since) {
         return levelCollection.find(Filters.gte("timestamp", since)).into(new ArrayList<>());
     }
+    public List<User> getAllUsers() {
+        return userCollection.find().into(new ArrayList<>());
+    }
 }

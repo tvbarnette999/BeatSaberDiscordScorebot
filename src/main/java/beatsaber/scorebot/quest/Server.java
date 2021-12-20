@@ -39,6 +39,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static spark.Spark.after;
+import static spark.Spark.staticFiles;
 
 public class Server {
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
@@ -249,6 +250,7 @@ public class Server {
     }
 
     public static void main(String[] args) {
+        staticFiles.location("/public");
         Spark.port(8081);
         Spark.get("/hi", (request, response) -> "Hi");
         Spark.post("/score", (request, response) -> {
@@ -260,6 +262,12 @@ public class Server {
             ScoreSubmission score = new Gson().fromJson(request.queryParams("data"), ScoreSubmission.class);
             scoreSubmission(score);
             return "OK";
+        });
+        Spark.get("/users", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            List<User> users = dao.getAllUsers();
+            users.forEach(x -> x.scoresaberIdString = Long.toString(x.scoresaberId));
+            return new Gson().toJson(users);
         });
         Spark.get("/scores", (request, response) -> {
            response.header("Content-Type", "application/json");
