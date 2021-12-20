@@ -13,4 +13,5 @@ public class User {
     long scoresaberId;
     String scoresaberIdString;
     String bsaber;
+    int notify;
 }

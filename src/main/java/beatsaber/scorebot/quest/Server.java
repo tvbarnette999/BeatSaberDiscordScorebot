@@ -14,6 +14,7 @@ import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.channel.MessageChannel;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionApplicationCommandCallbackSpec;
+import discord4j.core.spec.MessageCreateSpec;
 import discord4j.discordjson.json.*;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.MultipartRequest;
@@ -36,6 +37,8 @@ import java.net.URLDecoder;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.IntFunction;
+import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
 import static spark.Spark.after;
@@ -49,6 +52,14 @@ public class Server {
     private static String channelId = Config.getProperty("discord.channelId");
     private static DAO dao = new DAO();
     public static final int COMMON_COUNT = 3;
+    public static final int NOTIFY_NEVER = 0;
+    public static final int NOTIFY_TOP_LOSS = 1;
+    public static final int NOTIFY_RANK_DOWN = 2;
+    public static final int NOTIFY_RANK_CHANGE = 3;
+    public static final String[] NOTIFY_MESSAGE = {
+            "never", "when you are knocked out of 1st", "when your rank drops", "when your rank changes"
+    };
+
     private static Color[] colors = {
             null,
             Color.of(0, 162, 121), //green
@@ -207,10 +218,17 @@ public class Server {
         previous.notGood = score.notGood;
         previous.timestamp = System.currentTimeMillis();
         calculateScoreMetrics(previous);
+        List<Score> oldLeaderboard = dao.getLeaderboard(previous.songHash, previous.difficulty);
         dao.saveScore(previous);
-
         List<Score> leaderboard = dao.getLeaderboard(previous.songHash, previous.difficulty);
-
+        ToIntBiFunction<List<Score>, Long> getRank = (lb, discordId) -> {
+            for (int i = 0; i < lb.size(); i++) {
+                if (lb.get(i).userDiscordId == user.discordId) {
+                    return i + 1;
+                }
+            }
+            return Integer.MAX_VALUE;
+        };
 
         /*
         Scenarios:
@@ -224,27 +242,64 @@ public class Server {
         /*
         Embed is not a ping. But the content row above the embed can be. Each person could config when they want to be pinged:
         0. Never
-        1. If they lose top spot
-        2. If their rank goes down
-        3. If their rank goes up or down (excluding first play)
-        4. [IF scenario 4 or 5 doesn't post to discord] When *they* trigger a post
+        1. If you lose top spot
+        2. If your rank goes down
+        3. If your rank goes up or down (excluding first play where score is bottom)
          */
+        String content = null;
+        try {
+            StringBuilder contentBuilder = new StringBuilder();
+            int oldRank = getRank.applyAsInt(oldLeaderboard, user.discordId);
+            int newRank = getRank.applyAsInt(leaderboard, user.discordId);
+            if (newRank < oldRank) {
+                List<Long> passed = new ArrayList<>();
+                for (int i = newRank; i < oldRank && i < leaderboard.size(); i++) {
+                    passed.add(leaderboard.get(i).userDiscordId);
+                }
+                // filter the list of users passed to only include those that want to be notified in this scenario (> TOP_LOSS is RANK_DOWN && RANK_CHANGE)
+                String mentions = passed.stream().map(dao::getUserByDiscordId).filter(x -> x.notify > NOTIFY_TOP_LOSS || (x.notify == NOTIFY_TOP_LOSS && leaderboard.get(1).userDiscordId == x.discordId))
+                        .map(x -> "<@" + x.discordId + ">").collect(Collectors.joining(","));
+                boolean selfNotify = user.notify == NOTIFY_RANK_CHANGE;
+                if (mentions.isEmpty()) {
+                    if (selfNotify) {
+                        contentBuilder.append("<@").append(user.discordId).append("> placed into rank ").append(newRank).append("!");
+                        content = contentBuilder.toString();
+                    }
+                } else {
+                    contentBuilder.append("Hey ").append(mentions).append("! ");
+                    if (selfNotify) {
+                        contentBuilder.append("<@").append(user.discordId).append("> passed you! ");
+                    } else {
+                        contentBuilder.append(user.displayName).append(" passed you! ");
+                    }
+                    contentBuilder.append("Better practice up!"); // TODO pull from list of phrases.
+                    content = contentBuilder.toString();
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Error forming embed content", e);
+        }
 
         String acc = new DecimalFormat("0.00").format(previous.accuracy);
         String accRank = previous.accuracyRank;
-
+        EmbedCreateSpec embed = EmbedCreateSpec.builder()
+                .title(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]")
+                .url("https://bsaber.com/songs/" + level.getId() + "/")
+                .description("<@"+ user.discordId + "> set a new high score of " + score.score)
+                .color(getColor(score.difficultyRank))
+                .thumbnail("https://scoresaber.com/imports/images/songs/" + hash + ".png")
+                //.footer(EmbedCreateFields.Footer.of(score.songAuthor, null))
+                .addField("Accuracy", acc + "% **" + accRank + "**", true)
+                .addField("Combo", score.fullCombo ? "**FC** :white_check_mark:" : (score.maxCombo + " / " + score.missed + " / " + score.badCuts), true)
+                .addField("Leaderboard:", getSongLeaderboardEmbedField(leaderboard), false)
+                .build();
+        MessageCreateSpec.Builder msg = MessageCreateSpec.builder();
+        if (content != null) {
+            msg.content(content);
+        }
+        msg.addEmbed(embed);
         discordClient.getChannelById(Snowflake.of(channelId)).ofType(MessageChannel.class)
-                .flatMap(channel -> channel.createMessage(EmbedCreateSpec.builder()
-                                .title(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]")
-                                .url("https://bsaber.com/songs/" + level.getId() + "/")
-                                .description("<@"+ user.discordId + "> set a new high score of " + score.score)
-                                .color(getColor(score.difficultyRank))
-                                .thumbnail("https://scoresaber.com/imports/images/songs/" + hash + ".png")
-                                //.footer(EmbedCreateFields.Footer.of(score.songAuthor, null))
-                                .addField("Accuracy", acc + "% **" + accRank + "**", true)
-                                .addField("Combo", score.fullCombo ? "**FC** :white_check_mark:" : (score.maxCombo + " / " + score.missed + " / " + score.badCuts), true)
-                                .addField("Leaderboard:", getSongLeaderboardEmbedField(leaderboard), false)
-                                .build()))//.withContent("<@"+ user.discordId + ">"))
+                .flatMap(channel -> channel.createMessage(msg.build()))//.withContent("<@"+ user.discordId + ">"))
                 .retry(5).block();
 
     }
@@ -357,6 +412,19 @@ public class Server {
                             .createMessage(MultipartRequest.ofRequestAndFiles(MessageCreateRequest.builder().content("<@" + discordUser.getId().asLong() + ">: put this file at `" + fileLocation + "`").build(), files))
                             .retry(5).subscribe();
                     return event.reply();
+                case "notify":
+                    opt = event.getOption("level");
+                    if (!opt.isPresent() || !opt.get().getValue().isPresent()) {
+                        return Flux.error(new IllegalArgumentException("Must specify notification setting: 0-3"));
+                    }
+                    discordUser = event.getInteraction().getUser();
+                    user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                    if (user == null) {
+                        return Flux.error(new IllegalArgumentException("No connected user! Use `/signup` first."));
+                    }
+                    user.setNotify((int) opt.get().getValue().get().asLong());
+                    dao.saveUser(user);
+                    return event.reply("You will be mentioned " + NOTIFY_MESSAGE[user.getNotify()]);
                 case "install" :
                     opt = event.getOption("platform");
                     if (!opt.isPresent() || !opt.get().getValue().isPresent()) {
@@ -507,6 +575,14 @@ public class Server {
         ).build();
         list.add(ApplicationCommandRequest.builder().name("config").description("Get customized config file for the mod").addOption(platforms).build());
         list.add(ApplicationCommandRequest.builder().name("install").description("Get install instructions").addOption(platforms).build());
+        list.add(ApplicationCommandRequest.builder().name("notify").description("Set when the bot mentions you in a score post.").addOption(
+                ApplicationCommandOptionData.builder().name("level").type(ApplicationCommandOption.Type.INTEGER.getValue()).description("The mention setting").required(true).choices(
+                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[0], 0),
+                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[1], 1),
+                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[2], 2),
+                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[3], 3)
+                ).build()
+        ).build());
         list.add(ApplicationCommandRequest.builder()
                 .name("scoresaber")
                 .description("Associate your account with a scoresaber account")
