@@ -87,7 +87,7 @@
                             case 3: clazz = "bronze"; break;
                         }
                         return `<div class="score">
-                                    ${renderNumber(d)}<div class="medal ${clazz}">${r.scores[u.discordId].localRank}</div><br>
+                                    ${renderNumber(d)} ${r.scores[u.discordId].fc ? `<span class="fc">FC</span>`: ""}<div class="medal ${clazz}">${r.scores[u.discordId].localRank}</div><br>
                                     <span ${r.scores[u.discordId].rank && !r.scores[u.discordId].ssMatch ? `class="ssMismatch" title="Scoresaber score: ${renderNumber(r.scores[u.discordId].ssScore)}"` : ""}>${r.scores[u.discordId].rank ? `(<a href="https://scoresaber.com/leaderboard/${r.scoresaberId}?page=${Math.floor((r.scores[u.discordId].rank -1) / 12) + 1}" target="_blank">#${renderNumber(r.scores[u.discordId].rank)}</a>)` : '(--)'}</span>
                                 </div> `
                     }
@@ -213,6 +213,13 @@
     }
     .diff.d1 {
         background-color: var(--easy);
+    }
+    .fc {
+        background-color: green;
+        color: white;
+        font-weight: bold;
+        padding: 0 4px 0 4px;
+        border-radius: 5px;
     }
 </style>
 </html>
