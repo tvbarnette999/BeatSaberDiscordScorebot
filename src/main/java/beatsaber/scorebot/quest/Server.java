@@ -431,6 +431,7 @@ public class Server {
                     // return a leaderboard of how many 1st, 2nd, and 3rd places everyone has
                     List<Leaderboard> lbs = dao.getLeaderboard();
                     StringBuilder sb = new StringBuilder();
+                    sb.append("[Click here for detailed leaderboard](").append(Config.getProperty("server.url")).append(")\n");
                     sb.append("```");
                     sb.append("Rnk  1st  2nd  3rd  Name\n");
                     for (int i = 0; i < lbs.size(); i++) {
