@@ -272,7 +272,7 @@ public class Server {
                     } else {
                         contentBuilder.append(user.displayName).append(" passed you! ");
                     }
-                    contentBuilder.append("Better practice up!"); // TODO pull from list of phrases.
+                    contentBuilder.append(Messages.MESSAGES[new Random().nextInt(Messages.MESSAGES.length)]);
                     content = contentBuilder.toString();
                 }
             }
