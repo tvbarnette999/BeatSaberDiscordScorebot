@@ -182,7 +182,7 @@ public class DAO {
         return s == null ? -1 : s.difficulty;
     }
     public List<Score> getAllScores(long postedSince) {
-        return scoreCollection.find(Filters.gte("timestamp", postedSince)).projection(Projections.include("songHash", "difficulty", "userDiscordId", "score", "fullCombo")).into(new ArrayList<>());
+        return scoreCollection.find(Filters.gte("timestamp", postedSince)).projection(Projections.include("songHash", "difficulty", "userDiscordId", "score", "fullCombo", "accuracy", "accuracyRank")).into(new ArrayList<>());
     }
     public List<Level> getAllLevels(long since) {
         return levelCollection.find(Filters.gte("timestamp", since)).into(new ArrayList<>());

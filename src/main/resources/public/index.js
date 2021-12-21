@@ -27,7 +27,7 @@ function combineData() {
             map.set(k, {level: level, hash:  score.songHash, difficulty: score.difficulty, scores: {}, scoreCount: 0});
         }
         let v = map.get(k);
-        v.scores[score.userDiscordId] = {score: score.score, fc: score.fullCombo};
+        v.scores[score.userDiscordId] = {score: score.score, fc: score.fullCombo, accuracy: score.accuracy, grade: score.accuracyRank};
         v.scoreCount++;
     }
     data = Array.from(map.values());

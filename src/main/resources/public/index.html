@@ -86,9 +86,11 @@
                             case 2: clazz = "silver"; break;
                             case 3: clazz = "bronze"; break;
                         }
-                        return `<div class="score">
-                                    ${renderNumber(d)} ${r.scores[u.discordId].fc ? `<span class="fc">FC</span>`: ""}<div class="medal ${clazz}">${r.scores[u.discordId].localRank}</div><br>
-                                    <span ${r.scores[u.discordId].rank && !r.scores[u.discordId].ssMatch ? `class="ssMismatch" title="Scoresaber score: ${renderNumber(r.scores[u.discordId].ssScore)}"` : ""}>${r.scores[u.discordId].rank ? `(<a href="https://scoresaber.com/leaderboard/${r.scoresaberId}?page=${Math.floor((r.scores[u.discordId].rank -1) / 12) + 1}" target="_blank">#${renderNumber(r.scores[u.discordId].rank)}</a>)` : '(--)'}</span>
+                        let score = r.scores[u.discordId];
+                        let title = score.accuracy.toFixed(2) + "%  " + score.grade;
+                        return `<div class="score" title="${title}">
+                                    ${renderNumber(d)} ${score.fc ? `<span class="fc">FC</span>`: ""}<div class="medal ${clazz}">${score.localRank}</div><br>
+                                    <span ${score.rank && !score.ssMatch ? `class="ssMismatch" title="Scoresaber score: ${renderNumber(score.ssScore)}"` : ""}>${score.rank ? `(<a href="https://scoresaber.com/leaderboard/${r.scoresaberId}?page=${Math.floor((score.rank -1) / 12) + 1}" target="_blank">#${renderNumber(score.rank)}</a>)` : '(--)'}</span>
                                 </div> `
                     }
                     return d;

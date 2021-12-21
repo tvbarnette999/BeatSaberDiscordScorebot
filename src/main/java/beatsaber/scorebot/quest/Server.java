@@ -337,7 +337,7 @@ public class Server {
 
                @Override
                public boolean shouldSkipField(FieldAttributes f) {
-                   for (String s : new String[]{"songHash", "difficulty", "userDiscordId", "score", "fullCombo"}) {
+                   for (String s : new String[]{"songHash", "difficulty", "userDiscordId", "score", "fullCombo", "accuracy", "accuracyRank"}) {
                        if (s.equals(f.getName())) {
                            return false;
                        }
