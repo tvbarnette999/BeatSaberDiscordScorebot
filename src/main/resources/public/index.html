@@ -21,11 +21,21 @@
 <script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://use.fontawesome.com/56bce617c5.js"></script>
 
-<script src="/scoresaber.js"></script>
+<!--<script src="/scoresaber.js"></script>-->
 <script src="/index.js"></script>
 <script>
     let data = [];
+    let scoresaberWorker;
     $(document).ready(() => {
+        if (window.Worker) {
+            scoresaberWorker = new Worker("scoresaber.js");
+            scoresaberWorker.onmessage = e => {
+                console.log("Scoresaber Data!", e.data);
+                mergeScoresaberData(e.data);
+            };
+        } else {
+            console.warn("Webworkers not supported - scoresaber data will not be loaded.");
+        }
         initLeaderboard();
     });
     function renderNumber(n) {

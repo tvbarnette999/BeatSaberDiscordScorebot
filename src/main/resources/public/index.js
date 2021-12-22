@@ -4,9 +4,8 @@ let scores = [];
 function initLeaderboard() {
     let A = fetch("/users").then(r => r.json()).then(d => {
         users = d;
-        scoresaberUsers = users.filter(x => x.scoresaberIdString).map(x => x.scoresaberIdString);
-        console.log(scoresaberUsers);
-        initScoresaberCache();
+        let msg = users.filter(x => x.scoresaberIdString).map(x => x.scoresaberIdString);
+        scoresaberWorker.postMessage(msg);
     });
     let B = fetch("/levels").then(r => r.json()).then(d => {
         levels = d;

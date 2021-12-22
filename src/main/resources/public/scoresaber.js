@@ -6,13 +6,18 @@ let eventTarget = null;
 let scoresaber = true;
 let dataMap = {};
 let dataArray = [];
+onmessage = function (e) {
+    console.log("Worker got users", e.data);
+    scoresaberUsers = e.data;
+    initScoresaberCache();
+}
 function initScoresaberCache() {
-    if (!window.indexedDB) {
+    if (!indexedDB) {
         console.warn("Your browser doesn't support a stable version of IndexedDB. Scoresaber data will not be fetched");
         scoresaber = false;
         return;
     }
-    let request = window.indexedDB.open("ScoresaberCache", 3);
+    let request = indexedDB.open("ScoresaberCache", 3);
     request.onerror = (event) => {
         // Do something with request.errorCode!
     };
@@ -39,9 +44,6 @@ function initScoresaberCache() {
     };
     request.onsuccess = (event) => {
         db = event.target.result;
-        // prep event listener
-        eventTarget = $("#event");
-        eventTarget[0].addEventListener('userLoaded', handleDoneLoadingUser, false);
         loadScoresaberData();
     }
 }
@@ -93,7 +95,7 @@ function updateUser(userId, page = 1, toSave, retry = 0) {
                     r.onerror = (e) => console.log("error", s, e);
                 })
                 const ev = new CustomEvent('userLoaded', { detail: userId });
-                eventTarget[0].dispatchEvent(ev);
+                handleDoneLoadingUser(ev);
             }
             if (!r.ok) {
                 done()
@@ -184,7 +186,7 @@ function loadCompleteDataset() {
                 dataArray.push(dataMap[k]);
             }
             console.log("Full scoresaber dataset loaded.");
-            mergeScoresaberData(dataArray);
+            postMessage(dataArray);
         }
     }
 }
