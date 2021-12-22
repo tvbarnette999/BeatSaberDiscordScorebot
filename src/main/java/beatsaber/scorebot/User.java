@@ -1,4 +1,4 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 import lombok.Getter;
 import lombok.Setter;

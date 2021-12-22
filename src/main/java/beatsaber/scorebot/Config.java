@@ -1,4 +1,4 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 import java.io.File;
 import java.io.FileInputStream;

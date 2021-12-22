@@ -1,10 +1,9 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 import com.mongodb.*;
 import com.mongodb.client.*;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.*;
-import com.mongodb.operation.AggregateOperation;
 import org.bson.Document;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;

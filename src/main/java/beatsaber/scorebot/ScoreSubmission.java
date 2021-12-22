@@ -1,4 +1,4 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

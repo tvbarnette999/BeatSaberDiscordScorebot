@@ -1,4 +1,4 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 public class Messages {
     // This should be read from a file but im too lazy to write that code.

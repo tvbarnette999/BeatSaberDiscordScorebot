@@ -1,11 +1,9 @@
-package beatsaber.scorebot.quest;
+package beatsaber.scorebot;
 
 import com.google.gson.*;
-import com.mongodb.client.model.Filters;
 import discord4j.common.ReactorResources;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
-import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
@@ -37,7 +35,6 @@ import java.net.URLDecoder;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.util.*;
-import java.util.function.IntFunction;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
