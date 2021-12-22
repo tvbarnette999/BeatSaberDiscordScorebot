@@ -82,6 +82,7 @@ function getUserData(userId) {
         updateUser(userId)
     });
 }
+const DAY = 60000 * 60 * 24;
 function updateUser(userId, page = 1, toSave, retry = 0) {
     if (!toSave) {
         toSave = [];
@@ -91,7 +92,7 @@ function updateUser(userId, page = 1, toSave, retry = 0) {
             let done = function() {
                 let store = db.transaction("scores", 'readwrite').objectStore("scores");
                 toSave.forEach((s) => {
-                    let r = store.add(s);
+                    let r = store.put(s);
                     r.onerror = (e) => console.log("error", s, e);
                 })
                 const ev = new CustomEvent('userLoaded', { detail: userId });
@@ -104,7 +105,8 @@ function updateUser(userId, page = 1, toSave, retry = 0) {
             r.json().then(d => {
                 for (let i = 0; i < d.scores.length; i++) {
                     d.scores[i].user = userId;
-                    if (new Date(d.scores[i].timeSet) <= lastScore[userId]) {
+                    d.scores[i].cacheTime = Date.now();
+                    if (new Date(d.scores[i].timeSet) <= lastScore[userId] && d.scores[i].cacheTime > Date.now() - DAY) {
                         console.log("Received score already cached - halting fetch for user " + userId);
                         done();
                         return;
