@@ -18,5 +18,7 @@ public class Messages {
             "Get fucked!",
             "Piece of cake!",
             "Time for a training montage.",
+            "ooof!",
+            "Ka-Chow!"
     };
 }

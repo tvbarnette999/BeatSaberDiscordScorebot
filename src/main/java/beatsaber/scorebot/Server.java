@@ -1,40 +1,34 @@
 package beatsaber.scorebot;
 
 import com.google.gson.*;
-import discord4j.common.ReactorResources;
-import discord4j.common.util.Snowflake;
-import discord4j.core.DiscordClient;
-import discord4j.core.GatewayDiscordClient;
-import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
-import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import discord4j.core.object.command.ApplicationCommandInteractionOption;
-import discord4j.core.object.command.ApplicationCommandOption;
-import discord4j.core.object.entity.channel.MessageChannel;
-import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.core.spec.InteractionApplicationCommandCallbackSpec;
-import discord4j.core.spec.MessageCreateSpec;
-import discord4j.discordjson.json.*;
-import discord4j.rest.util.Color;
-import discord4j.rest.util.MultipartRequest;
 import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import kong.unirest.json.JSONObject;
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.Command;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.FileUpload;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.netty.resources.ConnectionProvider;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 import spark.Spark;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
+import java.awt.*;
 import java.net.URLDecoder;
 import java.text.DecimalFormat;
-import java.time.Duration;
 import java.util.*;
+import java.util.List;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
@@ -44,7 +38,7 @@ import static spark.Spark.staticFiles;
 public class Server {
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
     private static final String DiscordBotToken = Config.getProperty("discord.token");
-    private static GatewayDiscordClient discordClient;
+    private static JDA discordClient;
     private static String guildId = Config.getProperty("discord.guildId");
     private static String channelId = Config.getProperty("discord.channelId");
     private static DAO dao = new DAO();
@@ -59,15 +53,15 @@ public class Server {
 
     private static Color[] colors = {
             null,
-            Color.of(0, 162, 121), //green
+            new Color(0, 162, 121), //green
             null,
-            Color.of(52, 152, 219), //blue
+            new Color(52, 152, 219), //blue
             null,
-            Color.of(218, 99, 0), //orange
+            new Color(218, 99, 0), //orange
             null,
-            Color.of(255, 56, 45), //red
+            new Color(255, 56, 45), //red
             null,
-            Color.of(102, 16, 242), //purple
+            new Color(102, 16, 242), //purple
     };
     private static final String[] DIFFICULTIES = {
             null, "Easy", null, "Normal", null, "Hard", null, "Expert", null, "Expert+"
@@ -279,29 +273,32 @@ public class Server {
 
         String acc = new DecimalFormat("0.00").format(previous.accuracy);
         String accRank = previous.accuracyRank;
-        EmbedCreateSpec embed = EmbedCreateSpec.builder()
-                .title(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]")
-                .url("https://bsaber.com/songs/" + level.getId() + "/")
-                .description("<@"+ user.discordId + "> set a new high score of " + score.score)
-                .color(getColor(score.difficultyRank))
-                .thumbnail("https://scoresaber.com/imports/images/songs/" + hash + ".png")
-                //.footer(EmbedCreateFields.Footer.of(score.songAuthor, null))
-                .addField("Accuracy", acc + "% **" + accRank + "**", true)
-                .addField("Combo", score.fullCombo ? "**FC** :white_check_mark:" : (score.maxCombo + " / " + score.missed + " / " + score.badCuts), true)
-                .addField("Leaderboard:", getSongLeaderboardEmbedField(leaderboard), false)
-                .build();
-        MessageCreateSpec.Builder msg = MessageCreateSpec.builder();
-        if (content != null) {
-            msg.content(content);
+        EmbedBuilder embed = new EmbedBuilder();
+        embed.setTitle(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]");
+        embed.setUrl("https://bsaber.com/songs/" + level.getId() + "/");
+        embed.setDescription("<@"+ user.discordId + "> set a new high score of " + score.score);
+        embed.setColor(getColor(score.difficultyRank));
+        embed.setThumbnail("https://scoresaber.com/imports/images/songs/" + hash + ".png");
+        embed.addField("Accuracy", acc + "% **" + accRank + "**", true);
+        embed.addField("Combo", score.fullCombo ? "**FC** :white_check_mark:" : (score.maxCombo + " / " + score.missed + " / " + score.badCuts), true);
+        embed.addField("Leaderboard:", getSongLeaderboardEmbedField(leaderboard), false);
+//        MessageEmbed msgEmbed = embed.build();
+//        MessageCreateSpec.Builder msg = MessageCreateSpec.builder();
+//        if (content != null) {
+//            msg.content(content);
+//        }
+//        msg.addEmbed(embed);
+        TextChannel channel = discordClient.getChannelById(TextChannel.class, channelId);
+        if (channel != null) {
+            channel.sendMessageEmbeds(embed.build()).queue();
         }
-        msg.addEmbed(embed);
-        discordClient.getChannelById(Snowflake.of(channelId)).ofType(MessageChannel.class)
-                .flatMap(channel -> channel.createMessage(msg.build()))//.withContent("<@"+ user.discordId + ">"))
-                .retry(5).block();
+//        discordClient.getChannelById(Snowflake.of(channelId)).ofType(MessageChannel.class)
+//                .flatMap(channel -> channel.createMessage(msg.build()))//.withContent("<@"+ user.discordId + ">"))
+//                .retry(5).block();
 
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         staticFiles.location("/public");
         Spark.port(8081);
         Spark.get("/hi", (request, response) -> "Hi");
@@ -364,119 +361,143 @@ public class Server {
         });
 
 
-        discordClient = DiscordClient.builder(DiscordBotToken).setReactorResources(
-                ReactorResources.builder().httpClient(
-                        ReactorResources.newHttpClient(ConnectionProvider.builder("custom").maxIdleTime(Duration.ofMinutes(4)).build())
-                ).build()
-        ).build().gateway().login().block();
-        discordClient.on(ChatInputInteractionEvent.class, event -> {
-            Optional<ApplicationCommandInteractionOption> opt;
-            discord4j.core.object.entity.User discordUser;
+        discordClient = JDABuilder.createDefault(DiscordBotToken).enableIntents(GatewayIntent.MESSAGE_CONTENT).build().awaitReady();
+        discordClient.addEventListener((net.dv8tion.jda.api.hooks.EventListener) (genericEvent -> {
+            // TODO bump to 17 for named instanceof?
+            if(!(genericEvent instanceof SlashCommandInteractionEvent)) {
+                return;
+            }
+            SlashCommandInteractionEvent event = (SlashCommandInteractionEvent) genericEvent;
+            OptionMapping opt;
+            net.dv8tion.jda.api.entities.User discordUser;
             User user;
-            switch(event.getCommandName()) {
+            EmbedBuilder embedBuilder = new EmbedBuilder();
+            switch(event.getName()) {
                 case "signup":
                     discordUser = event.getInteraction().getUser();
-                    user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                    user = dao.getUserByDiscordId(discordUser.getIdLong());
                     if (user == null) {
                         user = new User();
                         user.setId(new ObjectId());
                     }
-                    user.setDisplayName(discordUser.getUsername());
-                    user.setDiscordId(discordUser.getId().asLong());
+                    user.setDisplayName(discordUser.getEffectiveName()); // maybe this is the right name?
+                    user.setDiscordId(discordUser.getIdLong());
                     dao.saveUser(user);
-                    LOG.info("Mapped {} to {}", discordUser.getId().asLong(), discordUser.getUsername());
-                    return event.reply("<@" + discordUser.getId().asLong() + "> added!");
+                    LOG.info("Mapped {} to {}", discordUser.getIdLong(), discordUser.getEffectiveName());
+                    event.reply("<@" + discordUser.getIdLong() + "> added!").queue();
+                    break;
                 case "config":
                     opt = event.getOption("platform");
-                    if (!opt.isPresent() || !opt.get().getValue().isPresent()) {
-                        return Flux.error(new IllegalArgumentException("Must specify platform: PC or Quest"));
+                    if (opt == null) {
+                        event.reply("Must specify platform: PC or Quest").queue();
+                        break;
                     }
                     discordUser = event.getInteraction().getUser();
                     String url = Config.getProperty("server.url") + "/score";
                     JsonObject obj = new JsonObject();
-                    obj.addProperty("userId", discordUser.getId().asString());
+                    obj.addProperty("userId", discordUser.getId());
                     obj.addProperty("url", url);
                     JsonObject root = new JsonObject();
                     root.add("submitData", obj);
-                    String platform = opt.get().getValue().get().asString();
+                    String platform = opt.getAsString();
                     String fileName = platform.equals("PC") ? "PCDiscordScorebot.json" : "quest-discord-scorebot.json";
                     String fileLocation = platform.equals("PC") ? "steamapps/common/Beat Saber/UserData/" : "ModData/com.beatgames.beatsaber/Configs/";
                     GsonBuilder gb = new GsonBuilder();
                     gb.setPrettyPrinting();
                     // TODO see if it works on both platforms - may need to append a \n for unix
-                    List<Tuple2<String, InputStream>> files = Collections.singletonList(Tuples.of(fileName, new ByteArrayInputStream(gb.create().toJson(root).getBytes())));
-                    discordClient.rest().getChannelById(event.getInteraction().getChannelId())
-                            .createMessage(MultipartRequest.ofRequestAndFiles(MessageCreateRequest.builder().content("<@" + discordUser.getId().asLong() + ">: put this file at `" + fileLocation + "`").build(), files))
-                            .retry(5).subscribe();
-                    return event.reply();
+//                    event.getChannel().sendFiles(FileUpload.fromData(gb.create().toJson(root).getBytes(), fileName))
+//                            .addContent("<@" + discordUser.getIdLong() + ">: put this file at `" + fileLocation + "`").queue();
+                    event.replyFiles(FileUpload.fromData(gb.create().toJson(root).getBytes(), fileName))
+                            .addContent("<@" + discordUser.getIdLong() + ">: put this file at `" + fileLocation + "`").queue();
+                    break;
+
+
+//                    List<Tuple2<String, InputStream>> files = Collections.singletonList(Tuples.of(fileName, new ByteArrayInputStream(gb.create().toJson(root).getBytes())));
+//                    discordClient.rest().getChannelById(event.getInteraction().getChannelId())
+//                            .createMessage(MultipartRequest.ofRequestAndFiles(MessageCreateRequest.builder().content("<@" + discordUser.getId().asLong() + ">: put this file at `" + fileLocation + "`").build(), files))
+//                            .retry(5).subscribe();
+//                    return event.reply();
                 case "notify":
                     opt = event.getOption("level");
-                    if (!opt.isPresent() || !opt.get().getValue().isPresent()) {
-                        return Flux.error(new IllegalArgumentException("Must specify notification setting: 0-3"));
+                    if (opt == null) {
+                        event.reply("Must specify notification setting: 0-3").queue();
+                        break;
                     }
                     discordUser = event.getInteraction().getUser();
-                    user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                    user = dao.getUserByDiscordId(discordUser.getIdLong());
                     if (user == null) {
-                        return Flux.error(new IllegalArgumentException("No connected user! Use `/signup` first."));
+                        event.reply("No connected user! Use `/signup` first.").queue();
+                        break;
                     }
-                    user.setNotify((int) opt.get().getValue().get().asLong());
+                    user.setNotify(opt.getAsInt());
                     dao.saveUser(user);
-                    return event.reply("You will be mentioned " + NOTIFY_MESSAGE[user.getNotify()]);
+                    event.reply("You will be mentioned " + NOTIFY_MESSAGE[user.getNotify()]).queue();
+                    break;
                 case "install" :
                     opt = event.getOption("platform");
-                    if (!opt.isPresent() || !opt.get().getValue().isPresent()) {
-                        return Flux.error(new IllegalArgumentException("Must specify platform: PC or Quest"));
+                    if (opt == null) {
+                        event.reply("Must specify platform: PC or Quest").queue();
+                        break;
                     }
-                    return event.reply(opt.get().getValue().get().asString().equals("PC") ? "https://github.com/tvbarnette999/PCDiscordScorebot#readme" : "https://github.com/tvbarnette999/QuestDiscordScorebot#readme");
+                    event.reply(opt.getAsString().equals("PC") ? "https://github.com/tvbarnette999/PCDiscordScorebot#readme" : "https://github.com/tvbarnette999/QuestDiscordScorebot#readme").queue();
+                    break;
                 case "scoresaber":
                     opt = event.getOption("id");
-                    if (opt.isPresent()) {
-                        if (opt.get().getType() == ApplicationCommandOption.Type.INTEGER && opt.get().getValue().isPresent()) {
-                            long ssUserId = opt.get().getValue().get().asLong();
+                    if (opt != null) {
+                        if (opt.getType() == OptionType.INTEGER) {
+                            long ssUserId = opt.getAsLong();
                             discordUser = event.getInteraction().getUser();
-                            user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                            user = dao.getUserByDiscordId(discordUser.getIdLong());
                             if (user == null) {
-                                return Flux.error(new IllegalArgumentException("No connected user! Use `/signup` first."));
+                                event.reply("No connected user! Use `/signup` first.").queue();
+                                break;
                             }
                             user.setScoresaberId(ssUserId);
                             dao.saveUser(user);
-                            return event.reply("<@" + discordUser.getId().asLong() + "> mapped to scoresaber user https://scoresaber.com/u/" + user.scoresaberId);
+                            event.reply("<@" + discordUser.getIdLong() + "> mapped to scoresaber user https://scoresaber.com/u/" + user.scoresaberId).queue();
+                            break;
                         }  else {
-                            return Flux.error(new IllegalArgumentException("Scoresaber id must be an integer"));
+                            event.reply("Scoresaber id must be an integer").queue();
+                            break;
                         }
                     } else {
-                        return Flux.error(new IllegalArgumentException("Must pass a scoresaber id"));
+                        event.reply("Must pass a scoresaber id").queue();
+                        break;
                     }
                 case "bsaber":
                     opt = event.getOption("id");
-                    if (opt.isPresent()) {
-                        if (opt.get().getType() == ApplicationCommandOption.Type.STRING && opt.get().getValue().isPresent()) {
-                            String bsaberId = opt.get().getValue().get().asString();
+                    if (opt != null) {
+                        if (opt.getType() == OptionType.STRING) {
+                            String bsaberId = opt.getAsString();
                             discordUser = event.getInteraction().getUser();
-                            user = dao.getUserByDiscordId(discordUser.getId().asLong());
+                            user = dao.getUserByDiscordId(discordUser.getIdLong());
                             if (user == null) {
-                                return Flux.error(new IllegalArgumentException("No connected user! Use `/signup` first."));
+                                event.reply("No connected user! Use `/signup` first.").queue();
+                                break;
                             }
                             user.setBsaber(bsaberId);
                             dao.saveUser(user);
-                            return event.reply("<@" + discordUser.getId().asLong() + "> mapped to bsaber user https://bsaber.com/members/" + user.bsaber + "/");
+                            event.reply("<@" + discordUser.getIdLong() + "> mapped to bsaber user https://bsaber.com/members/" + user.bsaber + "/").queue();
+                            break;
                         }  else {
-                            return Flux.error(new IllegalArgumentException("bsaber id must be a valid string"));
+                            event.reply("bsaber id must be a valid string").queue();
+                            break;
                         }
                     } else {
-                        return Flux.error(new IllegalArgumentException("Must pass a bsaber id"));
+                        event.reply("Must pass a bsaber id").queue();
+                        break;
                     }
                 case "common":
                     // return a randomized of songs for which all passed users have posted scores. param: n the number
                     opt = event.getOption("count");
 
                     List<Long> ids = new ArrayList<>();
-                    ids.add(event.getInteraction().getUser().getId().asLong());
+                    ids.add(event.getInteraction().getUser().getIdLong());
                     for (int i = 0; i < COMMON_COUNT; i++) {
-                        Optional<ApplicationCommandInteractionOption> acc = event.getOption("account" + (i+1));
-                        if (acc.isPresent() && acc.get().getType() == ApplicationCommandOption.Type.USER && acc.get().getValue().isPresent()) {
+                        OptionMapping acc = event.getOption("account" + (i+1));
+                        if (acc != null && acc.getType() == OptionType.USER) {
                             try {
-                                ids.add(acc.get().getValue().get().asUser().retry(5).block().getId().asLong());
+                                ids.add(acc.getAsUser().getIdLong());
                             } catch(Exception e) {
                                 LOG.error("Error getting /common command users", e);
                             }
@@ -484,14 +505,15 @@ public class Server {
                     }
                     StringBuilder builder = new StringBuilder();
                     builder.append("```");
-                    int limit = opt.isPresent() && opt.get().getType() == ApplicationCommandOption.Type.INTEGER ? (int) opt.get().getValue().get().asLong() : 100;
+                    int limit = opt != null && opt.getType() == OptionType.INTEGER ? opt.getAsInt() : 100;
                     dao.getCommonSongs(limit, ids.stream().mapToLong(Long::longValue).toArray()).forEach(x -> {
                         if (builder.length() + x.songName.length() + 5 < 2000) {
                             builder.append("* ").append(x.songName).append("\n");
                         }
                     });
                     builder.append("```");
-                    return event.reply(builder.toString());
+                    event.reply(builder.toString()).queue();
+                    break;
                 case "leaderboard":
                     // return a leaderboard of how many 1st, 2nd, and 3rd places everyone has
                     List<Leaderboard> lbs = dao.getLeaderboard();
@@ -511,135 +533,107 @@ public class Server {
                                 .append(lbs.get(i).user.displayName).append("\n");
                     }
                     sb.append("```");
-                    return event.reply(InteractionApplicationCommandCallbackSpec.builder().addEmbed(EmbedCreateSpec.builder()
-                            .title("Leaderboard")
-                            .description(sb.toString())
-                            .build()).build());
+                    embedBuilder.setTitle("Leaderboard");
+                    embedBuilder.setDescription(sb.toString());
+                    event.replyEmbeds(embedBuilder.build()).queue();
+//                    event.reply(InteractionApplicationCommandCallbackSpec.builder().addEmbed(EmbedCreateSpec.builder()
+//                            .title("Leaderboard")
+//                            .description(sb.toString())
+//                            .build()).build());
+                    break;
                 case "ping":
-                    return event.reply("Pong!");
+                    event.reply("Pong!").queue();
+                    break;
                 case "song":
-                    String id = event.getOption("name").get().getValue().get().asString();
+                    opt = event.getOption("name");
+                    if (opt == null) {
+                        event.reply("Must include a song name!").queue();
+                        return;
+                    }
+                    String id = opt.getAsString();
                     if (id.contains(" - ")) {
                         id = id.substring(0, id.indexOf(" - "));
                     }
                     Level level = dao.getLevelById(id);
                     if (level == null) {
-                        return event.reply("Song not found");
+                        event.reply("Song not found").queue();
+                        break;
                     }
                     int diff = dao.getHighestDifficulty(level.hash);
 
-                    EmbedCreateSpec.Builder embedBuilder = EmbedCreateSpec.builder()
-                            .author(level.songAuthorName, null, null)
-                            .title(level.songName)
-                            .thumbnail("https://scoresaber.com/imports/images/songs/" + level.hash + ".png")
-                            .url("https://bsaber.com/songs/" + level.getId() + "/")
-                            .description("Mapped by: " + level.levelAuthorName+"\nRanked: " + (level.ranked ? "Yes" : "No") +
+                    embedBuilder.setAuthor(level.songAuthorName, null, null);
+                    embedBuilder.setTitle(level.songName);
+                    embedBuilder.setThumbnail("https://scoresaber.com/imports/images/songs/" + level.hash + ".png");
+                    embedBuilder.setUrl("https://bsaber.com/songs/" + level.getId() + "/");
+                    embedBuilder.setDescription("Mapped by: " + level.levelAuthorName + "\nRanked: " + (level.ranked ? "Yes" : "No") +
                                     "\n[BSR](https://beatsaver.com/maps/" + level.id+") " +
                                     "\n[Preview](https://skystudioapps.com/bs-viewer/?id=" + level.id + ")");
                     if (diff > 0) {
                         List<Score> scores = dao.getLeaderboard(level.hash, diff);
                         embedBuilder.addField("Leaderboard [" + getDifficultyName(diff) + "]", getSongLeaderboardEmbedField(scores), false);
                     }
-                    return event.reply(InteractionApplicationCommandCallbackSpec.builder().addEmbed(embedBuilder.build()).build());
+                    event.replyEmbeds(embedBuilder.build()).queue();
+                    break;
                 default:
-                    return Flux.error(new IllegalArgumentException("Command name '" + event.getCommandName() + "' not supported"));
+                    event.reply("Command name '" + event.getName() + "' not supported").queue();
             }
-        }).subscribe();
+        }));
 
-        discordClient.on(ChatInputAutoCompleteEvent.class, event -> {
-            if (event.getCommandName().equals("song") && event.getFocusedOption().getName().equals("name")) {
-                String prefix = event.getFocusedOption().getValue().get().asString();
+        discordClient.addEventListener((net.dv8tion.jda.api.hooks.EventListener) (genericEvent -> {
+            if(!(genericEvent instanceof CommandAutoCompleteInteractionEvent)) {
+                return;
+            }
+            CommandAutoCompleteInteractionEvent event = (CommandAutoCompleteInteractionEvent) genericEvent;
+            if (event.getName().equals("song") && event.getFocusedOption().getName().equals("name")) {
+                String prefix = event.getFocusedOption().getValue();
                 List<Level> levels = dao.getLevelsByName(prefix);
-                return event.respondWithSuggestions(levels.stream().map(c -> ApplicationCommandOptionChoiceData.builder().name(c.id + " - " + c.songName).value(c.id).build()).collect(Collectors.toList()));
+                event.replyChoices(levels.stream().map(c -> new Command.Choice(c.id + " - " + c.songName, c.id)).collect(Collectors.toList())).queue();
             }
-            return Mono.empty();
-        }).subscribe();
+        }));
 
-        Snowflake applicationId = discordClient.getApplicationInfo().retry(5).block().getId();
-        Snowflake guildSnowflake = Snowflake.of(guildId);
-        discordClient.getRestClient().getApplicationService().bulkOverwriteGuildApplicationCommand(applicationId.asLong(), guildSnowflake.asLong(), getCommandRequests()).retry(5).subscribe();
+//        Snowflake applicationId = discordClient.getApplicationInfo().retry(5).block().getId();
+//        Snowflake guildSnowflake = Snowflake.of(guildId);
+//        discordClient.getRestClient().getApplicationService().bulkOverwriteGuildApplicationCommand(applicationId.asLong(), guildSnowflake.asLong(), getCommandRequests()).retry(5).subscribe();
+        discordClient.updateCommands().addCommands(getCommandRequests()).queue();
+        // TODO (above i old, new is: should be channel.getGuild().updateCommands().addCommands(getCommandData()).queue();
     }
 
     /*
         Generate the command suggestions
      */
-    private static List<ApplicationCommandRequest> getCommandRequests() {
-        List<ApplicationCommandRequest> list = new ArrayList<>();
-        list.add(ApplicationCommandRequest.builder().name("signup").description("Sign up to have your scores submitted").build());
-        ApplicationCommandOptionData platforms = ApplicationCommandOptionData.builder().name("platform").type(ApplicationCommandOption.Type.STRING.getValue()).description("The platform BeatSaber is running on.").required(true).choices(
-                ImmutableApplicationCommandOptionChoiceData.of("PC", "PC"),
-                ImmutableApplicationCommandOptionChoiceData.of("Quest", "QUEST")
-        ).build();
-        list.add(ApplicationCommandRequest.builder().name("config").description("Get customized config file for the mod").addOption(platforms).build());
-        list.add(ApplicationCommandRequest.builder().name("install").description("Get install instructions").addOption(platforms).build());
-        list.add(ApplicationCommandRequest.builder().name("notify").description("Set when the bot mentions you in a score post.").addOption(
-                ApplicationCommandOptionData.builder().name("level").type(ApplicationCommandOption.Type.INTEGER.getValue()).description("The mention setting").required(true).choices(
-                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[0], 0),
-                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[1], 1),
-                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[2], 2),
-                        ImmutableApplicationCommandOptionChoiceData.of(NOTIFY_MESSAGE[3], 3)
-                ).build()
-        ).build());
-        list.add(ApplicationCommandRequest.builder()
-                .name("scoresaber")
-                .description("Associate your account with a scoresaber account")
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("id")
-                        .description("Scoresaber user ID")
-                        .type(ApplicationCommandOption.Type.INTEGER.getValue())
-                        .required(true)
-                        .build())
-                .build());
-        list.add(ApplicationCommandRequest.builder()
-                .name("bsaber")
-                .description("Associate your account with a baaber account")
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("id")
-                        .description("bsaber user ID")
-                        .type(ApplicationCommandOption.Type.STRING.getValue())
-                        .required(true)
-                        .build())
-                .build());
-        ImmutableApplicationCommandRequest.Builder b = ApplicationCommandRequest.builder()
-                .name("common")
-                .description("Get list of songs you and others both have scores")
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("count")
-                        .description("The number of songs to list")
-                        .type(ApplicationCommandOption.Type.INTEGER.getValue())
-                        .required(true)
-                        .build());
+    private static List<CommandData> getCommandRequests() {
+        List<CommandData> list = new ArrayList<>();
+        list.add(Commands.slash("signup", "Sign up to have your scores submitted"));
+        OptionData platforms =  new OptionData(OptionType.STRING, "platform", "The platform BeatSaber is running on.", true)
+                        .addChoice("PC", "PC")
+                        .addChoice("Quest", "QUEST");
+        list.add(Commands.slash("config", "Get customized config file for the mod").addOptions(platforms));
+        list.add(Commands.slash("install", "Get install instructions").addOptions(platforms));
+        list.add(Commands.slash("notify", "Set when the bot mentions you in a score post.").addOptions(
+                new OptionData(OptionType.INTEGER, "level", "The mention setting", true)
+                        .addChoice(NOTIFY_MESSAGE[0], 0)
+                        .addChoice(NOTIFY_MESSAGE[1], 1)
+                        .addChoice(NOTIFY_MESSAGE[2], 2)
+                        .addChoice(NOTIFY_MESSAGE[3], 3)
+        ));
+        list.add(Commands.slash("scoresaber", "Associate your account with a scoresaber account").addOptions(
+                new OptionData(OptionType.INTEGER, "id", "Scoresaber user ID", true)
+        ));
+        list.add(Commands.slash("bsaber", "Associate your account with a bsaber account").addOptions(
+                new OptionData(OptionType.STRING, "id", "bsaber user ID", true)
+        ));
+        SlashCommandData common = Commands.slash("common", "Get list of songs you and others both have scores").addOptions(
+                new OptionData(OptionType.INTEGER, "count", "The number of songs to list", true)
+        );
         for (int i = 0; i < COMMON_COUNT; i++) {
-            b.addOption(ApplicationCommandOptionData.builder()
-                    .name("account" + (i+1))
-                    .description("An account to intersect")
-                    .type(ApplicationCommandOption.Type.USER.getValue())
-                    .required(i == 0)
-                    .build());
+            common.addOptions(new OptionData(OptionType.USER, "account" + (i+1), "An account to intersect", i == 0));
         }
-        list.add(b.build());
-
-        list.add(ApplicationCommandRequest.builder()
-                .name("song")
-                .description("Info about a song")
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("name")
-                        .autocomplete(true)
-                        .description("Song name")
-                        .type(ApplicationCommandOption.Type.STRING.getValue())
-                        .required(false)
-                        .build())
-                .build());
-
-        list.add(ApplicationCommandRequest.builder()
-                .name("leaderboard")
-                .description("Get overall leaderboard")
-                .build());
-
-        list.add(ApplicationCommandRequest.builder()
-                .name("ping")
-                .description("Ping the bot")
-                .build());
+        list.add(common);
+        list.add(Commands.slash("song", "Info about a song").addOptions(
+                new OptionData(OptionType.STRING, "name", "Song name", true, true)
+        ));
+        list.add(Commands.slash("leaderboard", "Get overall leaderboard"));
+        list.add(Commands.slash("ping", "Ping the bot"));
         return list;
     }
 }
