@@ -160,10 +160,10 @@ public class Server {
 
     public static void scoreSubmission(ScoreSubmission score) {
         if (score.userId.equals("12345")) {
-            LOG.warn("Ignoring score for default userId: {} on {}[{}]", score.score, score.songName, score.difficulty);
+            LOG.warn("Ignoring score for default userId: {} on {}[{}]", score.multipliedScore, score.songName, score.difficulty);
             return;
         }
-        LOG.info("Score for {} ({}): {}", score.levelId, score.songName, score.score);
+        LOG.info("Score for {} ({}): {}", score.levelId, score.songName, score.multipliedScore);
         LOG.info("Full score: " + new Gson().toJson(score));
         User user = dao.getUserByDiscordId(Long.parseLong(score.userId));
         if (user == null) {
@@ -187,8 +187,8 @@ public class Server {
         }
         Score previous = dao.getScore(hash, score.difficultyRank, user.discordId);
         // TODO do we want to count positive modifiers? Scoresaber currently does not.
-        if (previous != null && previous.score >= Math.min(score.score, score.modifiedScore)) {
-            LOG.info("Score is not player high: {} on {} by {}", score.score, level.getName(), user.getDisplayName());
+        if (previous != null && previous.score >= Math.min(score.multipliedScore, score.modifiedScore)) {
+            LOG.info("Score is not player high: {} on {} by {}", score.multipliedScore, level.getName(), user.getDisplayName());
             return;
         }
         if (previous == null) {
@@ -199,7 +199,8 @@ public class Server {
         }
         previous.rawScore = score.score;
         previous.modifiedScore = score.modifiedScore;
-        previous.score = Math.min(previous.rawScore, previous.modifiedScore);
+        //1.34.2 update: score no longer includes combos! multipliedScore is now what was previously score. rawScore is not no-comboScore.
+        previous.score = Math.min(score.multipliedScore, score.modifiedScore);
         previous.goodCuts = score.goodCuts;
         previous.badCuts = score.badCuts;
         previous.missed = score.missed;
@@ -276,7 +277,7 @@ public class Server {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle(level.getSongName() + " [" + getDifficultyName(score.difficultyRank) + "]");
         embed.setUrl("https://bsaber.com/songs/" + level.getId() + "/");
-        embed.setDescription("<@"+ user.discordId + "> set a new high score of " + score.score);
+        embed.setDescription("<@"+ user.discordId + "> set a new high score of " + score.multipliedScore);
         embed.setColor(getColor(score.difficultyRank));
         embed.setThumbnail("https://scoresaber.com/imports/images/songs/" + hash + ".png");
         embed.addField("Accuracy", acc + "% **" + accRank + "**", true);

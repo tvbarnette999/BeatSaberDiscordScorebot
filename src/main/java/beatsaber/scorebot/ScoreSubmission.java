@@ -10,10 +10,13 @@ public class ScoreSubmission {
     String songAuthor;
     String levelAuthor;
     String difficulty;
+    String modifiers;
+    boolean withoutMods;
     int difficultyRank;
     int difficultyRaw;
     int score;
     int modifiedScore;
+    int multipliedScore;
     boolean fullCombo;
     double leftSaberDistance;
     double leftHandDistance;
