@@ -23,4 +23,5 @@ public class Score {
     int maxScore;
     double accuracy;
     String accuracyRank;
+    boolean noMods;
 }

@@ -208,6 +208,7 @@ public class Server {
         previous.fullCombo = score.fullCombo;
         previous.ok = score.ok;
         previous.notGood = score.notGood;
+        previous.noMods = score.withoutMods;
         previous.timestamp = System.currentTimeMillis();
         calculateScoreMetrics(previous);
         List<Score> oldLeaderboard = dao.getLeaderboard(previous.songHash, previous.difficulty);
