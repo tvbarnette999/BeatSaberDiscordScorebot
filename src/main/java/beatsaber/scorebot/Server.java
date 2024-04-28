@@ -358,6 +358,21 @@ public class Server {
             }
             return new Gson().toJson(dao.getAllLevels(since));
         });
+        Spark.get("/proxy/full/:userId", (request, response) -> {
+            String userId = request.params("userId");
+            if (userId.equals("0")) return "{}";
+            HttpResponse<String> resp = Unirest.get("https://scoresaber.com/api/player/" + userId + "/full")
+                    .accept("application/json").asString();
+            return resp.getBody();
+        });
+        Spark.get("/proxy/scores/:userId/:page", (request, response) -> {
+            String userId = request.params("userId");
+            String page = request.params("page");
+            if (userId.equals("0")) return "{}";
+            HttpResponse<String> resp = Unirest.get("https://scoresaber.com/api/player/" + userId + "/scores?limit=10&sort=recent&page=" + page)
+                    .accept("application/json").asString();
+            return resp.getBody();
+        });
         after((request, response) -> {
             response.header("Content-Encoding", "gzip");
         });

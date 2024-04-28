@@ -28,7 +28,7 @@ function initScoresaberCache() {
         // Create an objectStore for this database
         let store = null;
         if (event.oldVersion < 1) {
-            store = db.createObjectStore("scores", {keyPath: ["user", "songHash", "difficulty"]});
+            store = db.createObjectStore("scores", {keyPath: ["user", "leaderboard.songHash", "leaderboard.difficulty.difficulty"]});
         } else {
             store = request.transaction.objectStore("scores");
         }
@@ -37,9 +37,9 @@ function initScoresaberCache() {
             case 1: //empty
             case 2:
             case 3:
-                store.createIndex("ts", "timeSet");
+                store.createIndex("ts", "score.timeSet");
                 store.createIndex("user", "user");
-                store.createIndex("song", ["songHash", "difficulty"]);
+                store.createIndex("song", ["leaderboard.songHash", "leaderboard.difficulty.difficulty"]);
         }
     };
     request.onsuccess = (event) => {
@@ -77,7 +77,8 @@ function updateData() {
 }
 let userData = {};
 function getUserData(userId) {
-    fetch(`https://new.scoresaber.com/api/player/${userId}/full`).then(r => r.json()).then(d => {
+    // https://scoresaber.com/api/player/${userId}/full
+    fetch(`proxy/full/${userId}`).then(r => r.json()).then(d => {
         userData[userId] = d;
         updateUser(userId)
     });
@@ -87,7 +88,8 @@ function updateUser(userId, page = 1, toSave, retry = 0) {
     if (!toSave) {
         toSave = [];
     }
-    fetch(`https://new.scoresaber.com/api/player/${userId}/scores/recent/${page}`)
+    //`https://scoresaber.com/api/player/${userId}/scores/recent/${page}`
+    fetch(`proxy/scores/${userId}/${page}`)
         .then( r => {
             let done = function() {
                 let store = db.transaction("scores", 'readwrite').objectStore("scores");
@@ -103,15 +105,19 @@ function updateUser(userId, page = 1, toSave, retry = 0) {
                 return; // done
             }
             r.json().then(d => {
-                for (let i = 0; i < d.scores.length; i++) {
-                    d.scores[i].user = userId;
-                    d.scores[i].cacheTime = Date.now();
-                    if (new Date(d.scores[i].timeSet) <= lastScore[userId] && d.scores[i].cacheTime > Date.now() - DAY) {
+                if (!d.playerScores || d.playerScores.length === 0) {
+                    done();
+                    return;
+                }
+                for (let i = 0; i < d.playerScores.length; i++) {
+                    d.playerScores[i].user = userId;
+                    d.playerScores[i].cacheTime = Date.now();
+                    if (new Date(d.playerScores[i].score.timeSet) <= lastScore[userId] && d.playerScores[i].cacheTime > Date.now() - DAY) {
                         console.log("Received score already cached - halting fetch for user " + userId);
                         done();
                         return;
                     }
-                    toSave.push(d.scores[i]);
+                    toSave.push(d.playerScores[i]);
                 }
                 updateUser(userId, page + 1, toSave);
             })
@@ -145,32 +151,32 @@ function loadCompleteDataset() {
         if (cursor) {
             if (scoresaberUsers.indexOf(cursor.value.user) >= 0) { // ignore entries for users removed
                 // create the merged score objects for the data table
-                let k = cursor.value.songHash + ':' + cursor.value.difficulty;
+                let k = cursor.value.leaderboard.songHash + ':' + cursor.value.leaderboard.difficulty.difficulty;
                 if (!dataMap[k]) {
                     dataMap[k] = {
-                        leaderboardId: cursor.value.leaderboardId,
-                        songHash: cursor.value.songHash,
-                        songName: cursor.value.songName,
-                        songSubName: cursor.value.songSubName,
-                        songAuthorName: cursor.value.songAuthorName,
-                        levelAuthorName: cursor.value.levelAuthorName,
-                        difficulty: cursor.value.difficulty,
-                        difficultyRaw: cursor.value.difficultyRaw,
+                        leaderboardId: cursor.value.leaderboard.leaderboardId,
+                        songHash: cursor.value.leaderboard.songHash,
+                        songName: cursor.value.leaderboard.songName,
+                        songSubName: cursor.value.leaderboard.songSubName,
+                        songAuthorName: cursor.value.leaderboard.songAuthorName,
+                        levelAuthorName: cursor.value.leaderboard.levelAuthorName,
+                        difficulty: cursor.value.leaderboard.difficulty.difficulty,
+                        difficultyRaw: cursor.value.leaderboard.difficulty.difficultyRaw,
                         users: 0,
                         scores: {}
                     };
                 }
                 dataMap[k].users++;
                 dataMap[k].scores[cursor.value.user] = {
-                    score: cursor.value.score,
-                    scoreId: cursor.value.scoreId,
-                    rank: cursor.value.rank,
-                    unmodifiedScore: cursor.value.unmodififiedScore,
-                    mods: cursor.value.mods,
-                    pp: cursor.value.pp,
-                    weight: cursor.value.weight,
-                    timeSet: cursor.value.timeSet,
-                    maxScore: cursor.value.maxScore
+                    score: cursor.value.score.modifiedScore,
+                    scoreId: cursor.value.score.id,
+                    rank: cursor.value.score.rank,
+                    unmodifiedScore: cursor.value.score.baseScore,
+                    mods: cursor.value.score.modifiers,
+                    pp: cursor.value.score.pp,
+                    weight: cursor.value.score.weight,
+                    timeSet: cursor.value.score.timeSet,
+                    maxScore: cursor.value.leaderboard.maxScore
                 }
             }
             cursor.continue();
