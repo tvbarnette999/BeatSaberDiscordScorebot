@@ -17,33 +17,36 @@ function initScoresaberCache() {
         scoresaber = false;
         return;
     }
-    let request = indexedDB.open("ScoresaberCache", 3);
+    let request = indexedDB.open("ScoresaberCache", 5);
+    console.log(request);
     request.onerror = (event) => {
         // Do something with request.errorCode!
+        console.log("DB Error!");
     };
+    request.onblocked = (event) => {
+        console.log("blocked!");
+    }
     request.onupgradeneeded = (event) => {
         console.log(event.oldVersion + " -> " + event.newVersion);
         // Save the IDBDatabase interface
-        var db = event.target.result;
+        let db = event.target.result;
         // Create an objectStore for this database
         let store = null;
-        if (event.oldVersion < 1) {
+        if (event.oldVersion < 5) {
+            db.deleteObjectStore("scores");
             store = db.createObjectStore("scores", {keyPath: ["user", "leaderboard.songHash", "leaderboard.difficulty.difficulty"]});
         } else {
             store = request.transaction.objectStore("scores");
         }
         switch(event.oldVersion) {
-            case 0: //handled special earlier
-            case 1: //empty
-            case 2:
-            case 3:
-                store.createIndex("ts", "score.timeSet");
-                store.createIndex("user", "user");
-                store.createIndex("song", ["leaderboard.songHash", "leaderboard.difficulty.difficulty"]);
+            // prior versions had to be wiped.
+            case 5:
+                break;
         }
     };
     request.onsuccess = (event) => {
         db = event.target.result;
+        console.log("DB Opened!");
         loadScoresaberData();
     }
 }
